@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-bg text-text font-sans;
+    min-height: 100vh;
+    font-size: 13.5px;
+  }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { @apply bg-border-hi rounded; }
+}
+
+@layer components {
+  .pill {
+    @apply text-[9px] px-[7px] py-[2px] rounded-full font-medium uppercase tracking-wider whitespace-nowrap border;
+  }
+  .pill-missing  { @apply bg-red-50   text-red-700   border-red-200; }
+  .pill-pending  { @apply bg-amber-50 text-amber-700 border-amber-200; }
+  .pill-processing { @apply bg-blue-50 text-blue-700 border-blue-200; }
+  .pill-paid     { @apply bg-green-50 text-green-700 border-green-200; }
+
+  .btn {
+    @apply px-[14px] py-[7px] rounded-lg font-sans text-xs cursor-pointer
+           border border-border bg-card text-t2 transition-all whitespace-nowrap;
+  }
+  .btn:hover { @apply border-border-hi text-text; }
+  .btn-accent {
+    @apply bg-navy text-white border-navy font-medium;
+  }
+  .btn-accent:hover { @apply opacity-85; }
+  .btn-sm { @apply px-[10px] py-[4px] text-[11px]; }
+
+  .field-label {
+    @apply text-[10px] text-t3 uppercase tracking-widest;
+  }
+  .field-input {
+    @apply w-full px-[10px] py-2 bg-card border border-border rounded-lg
+           text-text font-sans text-xs transition-colors
+           focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/15;
+  }
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes panelIn {
+  from { opacity: 0; transform: scale(0.97) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.anim-fadeup  { animation: fadeUp  0.3s ease both; }
+.anim-panelin { animation: panelIn 0.2s ease both; }
+.anim-toastin { animation: toastIn 0.2s ease both; }
