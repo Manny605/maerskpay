@@ -92,5 +92,13 @@ export function docId(opId, entryId, month, year) {
 }
 
 export function fmtAmt(n) {
-  return Number(n).toLocaleString('fr', { minimumFractionDigits: 0, maximumFractionDigits: 3 })
+  const num = Number(n)
+  if (!isFinite(num)) return ''
+  const neg = num < 0
+  const abs = Math.abs(num)
+  let [intPart, decPart = ''] = abs.toFixed(3).split('.')
+  decPart = decPart.replace(/0+$/, '')
+  intPart = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+  const result = decPart ? `${intPart},${decPart}` : intPart
+  return neg ? `-${result}` : result
 }

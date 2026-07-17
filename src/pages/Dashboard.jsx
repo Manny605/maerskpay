@@ -1,7 +1,18 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { getDatabases, getConfig, Query, OPERATORS, STATUS_LABELS, MONTHS, entryName, fmtAmt } from '../lib/appwrite'
 import DetailPanel from '../components/DetailPanel'
-import { exportCSV, exportPDF } from '../lib/export'
+import { exportCSV, exportPDF, exportAllCSV, exportAllPDF, ALL_COLUMNS } from '../lib/export'
+
+const SORT_GETTERS = {
+  period:   (r) => r.inv.year * 100 + r.inv.month,
+  operator: (r) => r.op?.name ?? r.inv.operator_id,
+  entry:    (r) => r.e ? entryName(r.e) : r.inv.entry_id,
+  status:   (r) => r.inv.status,
+  mode:     (r) => r.inv.pay_mode || '',
+  payDate:  (r) => r.inv.pay_date || '',
+  docs:     (r) => r.docs.length,
+  amount:   (r) => parseFloat(r.inv.amount) || 0,
+}
 
 const STATUS_PILL = {
   missing:    'pill-missing',
@@ -29,6 +40,14 @@ export default function Dashboard({ onToast }) {
   const [docsCache,    setDocsCache]    = useState({})
   const [loading, setLoading] = useState(false)
   const [active,  setActive]  = useState(null) // { op, entry }
+  const [allRows,    setAllRows]    = useState([])
+  const [loadingAll, setLoadingAll] = useState(false)
+  const [statusFilter,  setStatusFilter]  = useState('')
+  const [opFilter,      setOpFilter]      = useState('')
+  const [sortField,     setSortField]     = useState('period')
+  const [sortDir,       setSortDir]       = useState('desc')
+  const [exportCols,    setExportCols]    = useState(ALL_COLUMNS.map(c => c.key))
+  const [showColPicker, setShowColPicker] = useState(false)
 
   function cKey(opId, entryId) { return `${opId}__${entryId}__${month}__${year}` }
   function getInv(opId, entryId) { return invoiceCache[cKey(opId, entryId)] || null }
@@ -82,6 +101,67 @@ export default function Dashboard({ onToast }) {
 
   useEffect(() => { load() }, [load])
 
+  const loadAll = useCallback(async () => {
+    setLoadingAll(true)
+    const cfg = getConfig()
+    const db  = getDatabases()
+    try {
+      const res = await db.listDocuments(cfg.databaseId, 'invoices', [
+        Query.orderDesc('year'),
+        Query.limit(500),
+      ])
+      const docsByInvoice = {}
+      if (res.documents.length > 0) {
+        const dRes = await db.listDocuments(cfg.databaseId, 'invoice_docs', [
+          Query.equal('invoice_id', res.documents.map(d => d.$id)),
+          Query.limit(500),
+        ])
+        dRes.documents.forEach(d => {
+          docsByInvoice[d.invoice_id] = [...(docsByInvoice[d.invoice_id] || []), d]
+        })
+      }
+      const rows = res.documents
+        .slice()
+        .sort((a, b) => b.year - a.year || b.month - a.month)
+        .map(inv => {
+          const op = OPERATORS.find(o => o.id === inv.operator_id)
+          const e  = op?.entries.find(x => x.id === inv.entry_id)
+          return { op, e, inv, docs: docsByInvoice[inv.$id] || [] }
+        })
+      setAllRows(rows)
+    } catch (e) {
+      if (e.code !== 404) onToast('Erreur chargement liste globale : ' + e.message, 'err')
+      setAllRows([])
+    } finally {
+      setLoadingAll(false)
+    }
+  }, [])
+
+  useEffect(() => { loadAll() }, [loadAll])
+
+  const sortedFilteredRows = useMemo(() => {
+    let rows = allRows
+    if (statusFilter) rows = rows.filter(r => r.inv.status === statusFilter)
+    if (opFilter)     rows = rows.filter(r => r.inv.operator_id === opFilter)
+    const getter = SORT_GETTERS[sortField] || SORT_GETTERS.period
+    rows = [...rows].sort((a, b) => {
+      const va = getter(a), vb = getter(b)
+      if (va < vb) return sortDir === 'asc' ? -1 : 1
+      if (va > vb) return sortDir === 'asc' ? 1 : -1
+      return 0
+    })
+    return rows
+  }, [allRows, statusFilter, opFilter, sortField, sortDir])
+
+  function toggleSort(key) {
+    if (sortField === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortField(key); setSortDir('asc') }
+  }
+
+  function toggleExportCol(key) {
+    setExportCols(cols => cols.includes(key) ? cols.filter(k => k !== key) : [...cols, key])
+  }
+
   function changeMonth(delta) {
     setActive(null)
     setMonth(m => {
@@ -98,6 +178,7 @@ export default function Dashboard({ onToast }) {
     setInvoiceCache(c => ({ ...c, [k]: savedDoc }))
     setDocsCache(d => ({ ...d, [k]: newDocs }))
     onToast('Facture enregistrée.', 'ok')
+    loadAll()
   }
 
   // Stats
@@ -152,6 +233,20 @@ export default function Dashboard({ onToast }) {
     })))
     exportPDF(rows, month, year, { total, missing, pending, paid })
     onToast('Export PDF téléchargé.', 'ok')
+  }
+
+  function doExportAllCSV() {
+    if (sortedFilteredRows.length === 0) { onToast('Aucune facture à exporter.', 'info'); return }
+    if (exportCols.length === 0) { onToast('Sélectionnez au moins une colonne.', 'info'); return }
+    exportAllCSV(sortedFilteredRows, exportCols)
+    onToast('Export CSV (toutes factures) téléchargé.', 'ok')
+  }
+
+  function doExportAllPDF() {
+    if (sortedFilteredRows.length === 0) { onToast('Aucune facture à exporter.', 'info'); return }
+    if (exportCols.length === 0) { onToast('Sélectionnez au moins une colonne.', 'info'); return }
+    exportAllPDF(sortedFilteredRows, exportCols)
+    onToast('Export PDF (toutes factures) téléchargé.', 'ok')
   }
 
   return (
@@ -244,6 +339,88 @@ export default function Dashboard({ onToast }) {
             </div>
           )
         })}
+      </div>
+
+      {/* All invoices — exportable list */}
+      <div className="bg-surface border border-border rounded-2xl overflow-hidden mt-5 anim-fadeup">
+        <div className="flex items-center justify-between px-[14px] py-3 border-b border-border flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <span className="font-display text-[15px] font-semibold text-navy">Toutes les factures</span>
+            <span className="text-[10px] text-t3">({sortedFilteredRows.length})</span>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <select className="field-input w-auto" value={opFilter} onChange={e => setOpFilter(e.target.value)}>
+              <option value="">Tous les opérateurs</option>
+              {OPERATORS.map(op => <option key={op.id} value={op.id}>{op.name}</option>)}
+            </select>
+            <select className="field-input w-auto" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+              <option value="">Tous les statuts</option>
+              {Object.entries(STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            </select>
+
+            <div className="relative">
+              <button className="btn btn-sm" onClick={() => setShowColPicker(s => !s)}>⚙ Colonnes</button>
+              {showColPicker && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setShowColPicker(false)} />
+                  <div className="absolute right-0 top-full mt-1 z-20 bg-surface border border-border-hi rounded-lg p-2 w-[190px] shadow-lg">
+                    {ALL_COLUMNS.map(c => (
+                      <label key={c.key} className="flex items-center gap-2 px-2 py-[6px] text-xs text-t2 hover:bg-card-hover rounded cursor-pointer">
+                        <input type="checkbox" checked={exportCols.includes(c.key)} onChange={() => toggleExportCol(c.key)} />
+                        {c.label}
+                      </label>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
+            <button className="btn btn-sm" onClick={doExportAllCSV}>↓ CSV</button>
+            <button className="btn btn-sm" onClick={doExportAllPDF}>↓ PDF</button>
+          </div>
+        </div>
+
+        <div className="overflow-auto max-h-[420px]">
+          <table className="w-full border-collapse text-xs">
+            <thead>
+              <tr>
+                {[
+                  { key: 'period',   label: 'Période' },
+                  { key: 'operator', label: 'Opérateur' },
+                  { key: 'entry',    label: 'Site / Entité' },
+                  { key: 'status',   label: 'Statut' },
+                  { key: 'mode',     label: 'Mode' },
+                  { key: 'payDate',  label: 'Date paiement' },
+                  { key: 'docs',     label: 'Docs' },
+                  { key: 'amount',   label: 'Montant' },
+                ].map(col => (
+                  <th key={col.key} onClick={() => toggleSort(col.key)}
+                    className="text-left px-3 py-[10px] text-[10px] text-t3 uppercase tracking-widest border-b border-border bg-surface sticky top-0 cursor-pointer select-none hover:text-t2">
+                    {col.label}{sortField === col.key ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ''}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {loadingAll ? (
+                <tr><td colSpan={8} className="text-center text-t3 py-8">Chargement…</td></tr>
+              ) : sortedFilteredRows.length === 0 ? (
+                <tr><td colSpan={8} className="text-center text-t3 py-8">Aucune facture enregistrée.</td></tr>
+              ) : sortedFilteredRows.map(({ op, e, inv, docs }) => (
+                <tr key={inv.$id} className="hover:bg-card border-b border-border">
+                  <td className="px-3 py-[10px] text-t2">{MONTHS[inv.month]} {inv.year}</td>
+                  <td className={`px-3 py-[10px] font-medium ${OP_NAME_COLOR[inv.operator_id] || ''}`}>{op?.name || inv.operator_id}</td>
+                  <td className="px-3 py-[10px] text-t2">{e ? entryName(e) : inv.entry_id}</td>
+                  <td className="px-3 py-[10px]"><span className={`pill ${STATUS_PILL[inv.status]}`}>{STATUS_LABELS[inv.status]}</span></td>
+                  <td className="px-3 py-[10px] text-t2">{inv.pay_mode ? (inv.pay_mode === 'virement' ? '⇄ Virement' : '☑ Chèque') : '—'}</td>
+                  <td className="px-3 py-[10px] text-t2">{inv.pay_date ? new Date(inv.pay_date).toLocaleDateString('fr') : '—'}</td>
+                  <td className="px-3 py-[10px] text-center text-t2">{docs.length > 0 ? `📎 ${docs.length}` : '—'}</td>
+                  <td className="px-3 py-[10px] text-right font-mono text-text">{inv.amount ? fmtAmt(inv.amount)+' MRU' : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Detail Panel */}
