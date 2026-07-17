@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { getDatabases, getConfig, Query, OPERATORS, STATUS_LABELS, MONTHS, entryName, fmtAmt } from '../lib/appwrite'
 
 const STATUS_PILL = {
@@ -7,11 +7,36 @@ const STATUS_PILL = {
 }
 const OP_COLOR = { mauritel: 'text-mauritel', rimatel: 'text-rimatel', mattel: 'text-mattel' }
 
+const HEADER_COLS = [
+  { key: 'period',   label: 'Période' },
+  { key: 'operator', label: 'Opérateur' },
+  { key: 'entry',    label: 'Site / Entité' },
+  { key: 'status',   label: 'Statut' },
+  { key: 'mode',     label: 'Mode' },
+  { key: 'payDate',  label: 'Date paiement' },
+  { key: 'docs',     label: 'Docs' },
+  { key: 'amount',   label: 'Montant' },
+]
+
+const SORT_GETTERS = {
+  period:   (r) => r.row.year * 100 + r.row.month,
+  operator: (r) => r.op?.name ?? r.row.operator_id,
+  entry:    (r) => r.entry ? entryName(r.entry) : r.row.entry_id,
+  status:   (r) => r.row.status,
+  mode:     (r) => r.row.pay_mode || '',
+  payDate:  (r) => r.row.pay_date || '',
+  docs:     (r) => r.docCount,
+  amount:   (r) => parseFloat(r.row.amount) || 0,
+}
+
 export default function History({ onToast }) {
   const now = new Date()
   const [opFilter,     setOpFilter]     = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [yearFilter,   setYearFilter]   = useState(now.getFullYear())
+  const [search,       setSearch]       = useState('')
+  const [sortField,    setSortField]    = useState('period')
+  const [sortDir,      setSortDir]      = useState('desc')
   const [rows,         setRows]         = useState([])
   const [docCounts,    setDocCounts]    = useState({})
   const [loading,      setLoading]      = useState(false)
@@ -55,6 +80,42 @@ export default function History({ onToast }) {
 
   useEffect(() => { load() }, [opFilter, statusFilter, yearFilter])
 
+  function toggleSort(key) {
+    if (sortField === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortField(key); setSortDir('asc') }
+  }
+
+  const displayRows = useMemo(() => {
+    let list = rows.map(row => {
+      const op    = OPERATORS.find(o => o.id === row.operator_id)
+      const entry = op?.entries.find(e => e.id === row.entry_id)
+      return { row, op, entry, docCount: docCounts[row.$id] || 0 }
+    })
+
+    if (search.trim()) {
+      const q = search.trim().toLowerCase()
+      list = list.filter(({ row, op, entry }) => {
+        const haystack = [
+          op?.name,
+          entry ? entryName(entry) : row.entry_id,
+          row.pay_mode,
+          row.notes,
+          row.amount != null ? String(row.amount) : '',
+        ].filter(Boolean).join(' ').toLowerCase()
+        return haystack.includes(q)
+      })
+    }
+
+    const getter = SORT_GETTERS[sortField] || SORT_GETTERS.period
+    list = [...list].sort((a, b) => {
+      const va = getter(a), vb = getter(b)
+      if (va < vb) return sortDir === 'asc' ? -1 : 1
+      if (va > vb) return sortDir === 'asc' ? 1 : -1
+      return 0
+    })
+    return list
+  }, [rows, docCounts, search, sortField, sortDir])
+
   return (
     <div className="p-6 max-w-[1200px] mx-auto">
       {loading && (
@@ -78,6 +139,14 @@ export default function History({ onToast }) {
         <select className="field-input w-auto" value={yearFilter} onChange={e => setYearFilter(parseInt(e.target.value))}>
           {years.map(y => <option key={y} value={y}>{y}</option>)}
         </select>
+        <input
+          type="text"
+          className="field-input w-auto min-w-[220px]"
+          placeholder="Rechercher (site, notes, mode…)"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+        <span className="text-[11px] text-t3 ml-auto">{displayRows.length} facture{displayRows.length !== 1 ? 's' : ''}</span>
       </div>
 
       {/* Table */}
@@ -85,33 +154,29 @@ export default function History({ onToast }) {
         <table className="w-full border-collapse text-xs">
           <thead>
             <tr>
-              {['Période','Opérateur','Site / Entité','Statut','Mode','Date paiement','Docs','Montant'].map((h, i) => (
-                <th key={i} className="text-left px-3 py-[10px] text-[10px] text-t3 uppercase tracking-widest border-b border-border bg-surface sticky top-0">
-                  {h}
+              {HEADER_COLS.map(col => (
+                <th key={col.key} onClick={() => toggleSort(col.key)}
+                  className="text-left px-3 py-[10px] text-[10px] text-t3 uppercase tracking-widest border-b border-border bg-surface sticky top-0 cursor-pointer select-none hover:text-t2">
+                  {col.label}{sortField === col.key ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ''}
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {rows.length === 0 ? (
+            {displayRows.length === 0 ? (
               <tr><td colSpan={8} className="text-center text-t3 py-8">Aucune facture pour cette période.</td></tr>
-            ) : rows.map(row => {
-              const op    = OPERATORS.find(o => o.id === row.operator_id)
-              const entry = op?.entries.find(e => e.id === row.entry_id)
-              const cnt   = docCounts[row.$id] || 0
-              return (
-                <tr key={row.$id} className="hover:bg-card border-b border-border">
-                  <td className="px-3 py-[10px] text-t2">{MONTHS[row.month]} {row.year}</td>
-                  <td className={`px-3 py-[10px] font-medium ${OP_COLOR[row.operator_id]}`}>{op?.name || row.operator_id}</td>
-                  <td className="px-3 py-[10px] text-t2">{entry ? entryName(entry) : row.entry_id}</td>
-                  <td className="px-3 py-[10px]"><span className={`pill ${STATUS_PILL[row.status]}`}>{STATUS_LABELS[row.status]}</span></td>
-                  <td className="px-3 py-[10px] text-t2">{row.pay_mode ? (row.pay_mode === 'virement' ? '⇄ Virement' : '☑ Chèque') : '—'}</td>
-                  <td className="px-3 py-[10px] text-t2">{row.pay_date ? new Date(row.pay_date).toLocaleDateString('fr') : '—'}</td>
-                  <td className="px-3 py-[10px] text-center text-t2">{cnt > 0 ? `📎 ${cnt}` : '—'}</td>
-                  <td className="px-3 py-[10px] text-right font-mono text-text">{row.amount ? fmtAmt(row.amount)+' MRU' : '—'}</td>
-                </tr>
-              )
-            })}
+            ) : displayRows.map(({ row, op, entry, docCount }) => (
+              <tr key={row.$id} className="hover:bg-card border-b border-border">
+                <td className="px-3 py-[10px] text-t2">{MONTHS[row.month]} {row.year}</td>
+                <td className={`px-3 py-[10px] font-medium ${OP_COLOR[row.operator_id]}`}>{op?.name || row.operator_id}</td>
+                <td className="px-3 py-[10px] text-t2">{entry ? entryName(entry) : row.entry_id}</td>
+                <td className="px-3 py-[10px]"><span className={`pill ${STATUS_PILL[row.status]}`}>{STATUS_LABELS[row.status]}</span></td>
+                <td className="px-3 py-[10px] text-t2">{row.pay_mode ? (row.pay_mode === 'virement' ? '⇄ Virement' : '☑ Chèque') : '—'}</td>
+                <td className="px-3 py-[10px] text-t2">{row.pay_date ? new Date(row.pay_date).toLocaleDateString('fr') : '—'}</td>
+                <td className="px-3 py-[10px] text-center text-t2">{docCount > 0 ? `📎 ${docCount}` : '—'}</td>
+                <td className="px-3 py-[10px] text-right font-mono text-text">{row.amount ? fmtAmt(row.amount)+' MRU' : '—'}</td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
