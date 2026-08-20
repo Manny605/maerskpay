@@ -1,5 +1,8 @@
 import { useState, useEffect, useMemo } from 'react'
 import { getDatabases, getConfig, Query, OPERATORS, STATUS_LABELS, MONTHS, entryName, fmtAmt } from '../lib/appwrite'
+import ColumnPicker from '../components/ColumnPicker'
+import SortControls from '../components/SortControls'
+import { exportAllCSV, exportAllPDF, ALL_COLUMNS } from '../lib/export'
 
 const STATUS_PILL = {
   missing: 'pill-missing', pending: 'pill-pending',
@@ -37,9 +40,12 @@ export default function History({ onToast }) {
   const [search,       setSearch]       = useState('')
   const [sortField,    setSortField]    = useState('period')
   const [sortDir,      setSortDir]      = useState('desc')
+  const [sortField2,   setSortField2]   = useState(null)
+  const [sortDir2,     setSortDir2]     = useState('asc')
   const [rows,         setRows]         = useState([])
   const [docCounts,    setDocCounts]    = useState({})
   const [loading,      setLoading]      = useState(false)
+  const [exportCols,   setExportCols]   = useState(ALL_COLUMNS.map(c => c.key))
 
   const years = Array.from({ length: 4 }, (_, i) => now.getFullYear() - i)
 
@@ -82,7 +88,35 @@ export default function History({ onToast }) {
 
   function toggleSort(key) {
     if (sortField === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
-    else { setSortField(key); setSortDir('asc') }
+    else {
+      setSortField(key); setSortDir('asc')
+      if (sortField2 === key) setSortField2(null)
+    }
+  }
+
+  function toggleExportCol(key) {
+    setExportCols(cols => cols.includes(key) ? cols.filter(k => k !== key) : [...cols, key])
+  }
+
+  // Adapte la forme des lignes de l'historique à celle attendue par lib/export.js
+  function toExportRows(list) {
+    return list.map(({ row, op, entry, docCount }) => ({
+      op, e: entry, inv: row, docs: Array.from({ length: docCount }),
+    }))
+  }
+
+  function doExportCSV() {
+    if (displayRows.length === 0) { onToast('Aucune facture à exporter.', 'info'); return }
+    if (exportCols.length === 0) { onToast('Sélectionnez au moins une colonne.', 'info'); return }
+    exportAllCSV(toExportRows(displayRows), exportCols, 'historique_factures')
+    onToast('Export CSV téléchargé.', 'ok')
+  }
+
+  function doExportPDF() {
+    if (displayRows.length === 0) { onToast('Aucune facture à exporter.', 'info'); return }
+    if (exportCols.length === 0) { onToast('Sélectionnez au moins une colonne.', 'info'); return }
+    exportAllPDF(toExportRows(displayRows), exportCols, 'historique_factures', `Historique des factures (${displayRows.length})`)
+    onToast('Export PDF téléchargé.', 'ok')
   }
 
   const displayRows = useMemo(() => {
@@ -106,15 +140,21 @@ export default function History({ onToast }) {
       })
     }
 
-    const getter = SORT_GETTERS[sortField] || SORT_GETTERS.period
+    const getter  = SORT_GETTERS[sortField] || SORT_GETTERS.period
+    const getter2 = sortField2 ? SORT_GETTERS[sortField2] : null
     list = [...list].sort((a, b) => {
       const va = getter(a), vb = getter(b)
       if (va < vb) return sortDir === 'asc' ? -1 : 1
       if (va > vb) return sortDir === 'asc' ? 1 : -1
+      if (getter2) {
+        const va2 = getter2(a), vb2 = getter2(b)
+        if (va2 < vb2) return sortDir2 === 'asc' ? -1 : 1
+        if (va2 > vb2) return sortDir2 === 'asc' ? 1 : -1
+      }
       return 0
     })
     return list
-  }, [rows, docCounts, search, sortField, sortDir])
+  }, [rows, docCounts, search, sortField, sortDir, sortField2, sortDir2])
 
   return (
     <div className="p-6 max-w-[1200px] mx-auto">
@@ -146,7 +186,22 @@ export default function History({ onToast }) {
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
-        <span className="text-[11px] text-t3 ml-auto">{displayRows.length} facture{displayRows.length !== 1 ? 's' : ''}</span>
+        <span className="text-[11px] text-t3">{displayRows.length} facture{displayRows.length !== 1 ? 's' : ''}</span>
+
+        <div className="flex items-center gap-2 flex-wrap ml-auto">
+          <SortControls
+            fields={HEADER_COLS}
+            sortField={sortField} sortDir={sortDir}
+            onFieldChange={key => { setSortField(key); if (sortField2 === key) setSortField2(null) }}
+            onDirToggle={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
+            sortField2={sortField2} sortDir2={sortDir2}
+            onField2Change={setSortField2}
+            onDir2Toggle={() => setSortDir2(d => d === 'asc' ? 'desc' : 'asc')}
+          />
+          <ColumnPicker columns={ALL_COLUMNS} selected={exportCols} onToggle={toggleExportCol} />
+          <button className="btn btn-sm" onClick={doExportCSV}>↓ CSV</button>
+          <button className="btn btn-sm" onClick={doExportPDF}>↓ PDF</button>
+        </div>
       </div>
 
       {/* Table */}
@@ -157,7 +212,9 @@ export default function History({ onToast }) {
               {HEADER_COLS.map(col => (
                 <th key={col.key} onClick={() => toggleSort(col.key)}
                   className="text-left px-3 py-[10px] text-[10px] text-t3 uppercase tracking-widest border-b border-border bg-surface sticky top-0 cursor-pointer select-none hover:text-t2">
-                  {col.label}{sortField === col.key ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ''}
+                  {col.label}
+                  {sortField === col.key && (sortDir === 'asc' ? ' ▲' : ' ▼')}
+                  {sortField2 === col.key && (sortDir2 === 'asc' ? ' ²▲' : ' ²▼')}
                 </th>
               ))}
             </tr>

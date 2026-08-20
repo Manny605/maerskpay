@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react'
 import { getDatabases, getStorage, getConfig, ID, DOC_LABELS, fmtAmt, STATUS_LABELS, docId } from '../lib/appwrite'
 
-const DOC_PILL = { invoice: 'text-blue-700 bg-blue-50', payment: 'text-green-700 bg-green-50', cheque: 'text-amber-700 bg-amber-50' }
+const DOC_PILL = {
+  invoice: 'text-blue-700 bg-blue-50 dark:text-blue-300 dark:bg-blue-500/15',
+  payment: 'text-green-700 bg-green-50 dark:text-green-300 dark:bg-green-500/15',
+  cheque:  'text-amber-700 bg-amber-50 dark:text-amber-300 dark:bg-amber-500/15',
+}
 
 export default function DetailPanel({ op, entry, month, year, invoice, docs: initialDocs, onSaved, onClose }) {
   const [form, setForm] = useState({
@@ -143,7 +147,7 @@ export default function DetailPanel({ op, entry, month, year, invoice, docs: ini
         {/* Header */}
         <div className="flex items-start justify-between p-5 border-b border-border">
           <div>
-            <div className="font-display text-[17px] font-semibold text-navy">
+            <div className="font-display text-[17px] font-semibold text-heading">
               {op.name} · {entry.company ? `${entry.site} — ${entry.company}` : entry.site}
             </div>
             <div className="text-[11px] text-t3 mt-1">

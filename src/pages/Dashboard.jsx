@@ -1,7 +1,20 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { getDatabases, getConfig, Query, OPERATORS, STATUS_LABELS, MONTHS, entryName, fmtAmt } from '../lib/appwrite'
 import DetailPanel from '../components/DetailPanel'
+import ColumnPicker from '../components/ColumnPicker'
+import SortControls from '../components/SortControls'
 import { exportCSV, exportPDF, exportAllCSV, exportAllPDF, ALL_COLUMNS } from '../lib/export'
+
+const SORT_FIELDS = [
+  { key: 'period',   label: 'Période' },
+  { key: 'operator', label: 'Opérateur' },
+  { key: 'entry',    label: 'Site / Entité' },
+  { key: 'status',   label: 'Statut' },
+  { key: 'mode',     label: 'Mode' },
+  { key: 'payDate',  label: 'Date paiement' },
+  { key: 'docs',     label: 'Docs' },
+  { key: 'amount',   label: 'Montant' },
+]
 
 const SORT_GETTERS = {
   period:   (r) => r.inv.year * 100 + r.inv.month,
@@ -46,8 +59,9 @@ export default function Dashboard({ onToast }) {
   const [opFilter,      setOpFilter]      = useState('')
   const [sortField,     setSortField]     = useState('period')
   const [sortDir,       setSortDir]       = useState('desc')
+  const [sortField2,    setSortField2]    = useState(null)
+  const [sortDir2,      setSortDir2]      = useState('asc')
   const [exportCols,    setExportCols]    = useState(ALL_COLUMNS.map(c => c.key))
-  const [showColPicker, setShowColPicker] = useState(false)
 
   function cKey(opId, entryId) { return `${opId}__${entryId}__${month}__${year}` }
   function getInv(opId, entryId) { return invoiceCache[cKey(opId, entryId)] || null }
@@ -143,19 +157,28 @@ export default function Dashboard({ onToast }) {
     let rows = allRows
     if (statusFilter) rows = rows.filter(r => r.inv.status === statusFilter)
     if (opFilter)     rows = rows.filter(r => r.inv.operator_id === opFilter)
-    const getter = SORT_GETTERS[sortField] || SORT_GETTERS.period
+    const getter  = SORT_GETTERS[sortField] || SORT_GETTERS.period
+    const getter2 = sortField2 ? SORT_GETTERS[sortField2] : null
     rows = [...rows].sort((a, b) => {
       const va = getter(a), vb = getter(b)
       if (va < vb) return sortDir === 'asc' ? -1 : 1
       if (va > vb) return sortDir === 'asc' ? 1 : -1
+      if (getter2) {
+        const va2 = getter2(a), vb2 = getter2(b)
+        if (va2 < vb2) return sortDir2 === 'asc' ? -1 : 1
+        if (va2 > vb2) return sortDir2 === 'asc' ? 1 : -1
+      }
       return 0
     })
     return rows
-  }, [allRows, statusFilter, opFilter, sortField, sortDir])
+  }, [allRows, statusFilter, opFilter, sortField, sortDir, sortField2, sortDir2])
 
   function toggleSort(key) {
     if (sortField === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
-    else { setSortField(key); setSortDir('asc') }
+    else {
+      setSortField(key); setSortDir('asc')
+      if (sortField2 === key) setSortField2(null)
+    }
   }
 
   function toggleExportCol(key) {
@@ -212,9 +235,9 @@ export default function Dashboard({ onToast }) {
   const visibleAlerts = alerts.filter((_, i) => !dismissedAlerts.includes(i))
 
   const ALERT_STYLE = {
-    danger:  'bg-red-50 border-red-200 text-red-700',
-    warning: 'bg-amber-50 border-amber-200 text-amber-700',
-    info:    'bg-blue-50 border-blue-200 text-blue-700',
+    danger:  'bg-red-50 border-red-200 text-red-700 dark:bg-red-500/10 dark:border-red-500/25 dark:text-red-300',
+    warning: 'bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-500/10 dark:border-amber-500/25 dark:text-amber-300',
+    info:    'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-500/10 dark:border-blue-500/25 dark:text-blue-300',
   }
 
   function doExportCSV() {
@@ -262,7 +285,7 @@ export default function Dashboard({ onToast }) {
       <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-3">
           <button className="btn" onClick={() => changeMonth(-1)}>←</button>
-          <div className="font-display text-xl font-semibold text-navy min-w-[160px] text-center">
+          <div className="font-display text-xl font-semibold text-heading min-w-[160px] text-center">
             {MONTHS[month]} {year}
           </div>
           <button className="btn" onClick={() => changeMonth(1)}>→</button>
@@ -277,9 +300,9 @@ export default function Dashboard({ onToast }) {
       <div className="grid grid-cols-4 gap-[10px] mb-5">
         {[
           { label: 'Factures du mois',      value: total,   sub: `${MONTHS[month]} ${year}`,                        color: 'text-text' },
-          { label: 'Non reçues',             value: missing, sub: 'à relancer opérateur',                            color: 'text-red-600' },
-          { label: 'Reçues — non payées',    value: pending, sub: 'à régler',                                        color: 'text-amber-600' },
-          { label: 'Payées',                 value: paid,    sub: totalAmt > 0 ? fmtAmt(totalAmt)+' MRU' : 'ce mois-ci', color: 'text-green-600' },
+          { label: 'Non reçues',             value: missing, sub: 'à relancer opérateur',                            color: 'text-red-600 dark:text-red-400' },
+          { label: 'Reçues — non payées',    value: pending, sub: 'à régler',                                        color: 'text-amber-600 dark:text-amber-400' },
+          { label: 'Payées',                 value: paid,    sub: totalAmt > 0 ? fmtAmt(totalAmt)+' MRU' : 'ce mois-ci', color: 'text-green-600 dark:text-green-400' },
         ].map(({ label, value, sub, color }, i) => (
           <div key={i} className="bg-surface border border-border rounded-2xl p-4 anim-fadeup" style={{ animationDelay: `${i * 0.05}s` }}>
             <div className="text-[10px] text-t3 uppercase tracking-widest mb-1">{label}</div>
@@ -345,7 +368,7 @@ export default function Dashboard({ onToast }) {
       <div className="bg-surface border border-border rounded-2xl overflow-hidden mt-5 anim-fadeup">
         <div className="flex items-center justify-between px-[14px] py-3 border-b border-border flex-wrap gap-2">
           <div className="flex items-center gap-2">
-            <span className="font-display text-[15px] font-semibold text-navy">Toutes les factures</span>
+            <span className="font-display text-[15px] font-semibold text-heading">Toutes les factures</span>
             <span className="text-[10px] text-t3">({sortedFilteredRows.length})</span>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -358,22 +381,17 @@ export default function Dashboard({ onToast }) {
               {Object.entries(STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
 
-            <div className="relative">
-              <button className="btn btn-sm" onClick={() => setShowColPicker(s => !s)}>⚙ Colonnes</button>
-              {showColPicker && (
-                <>
-                  <div className="fixed inset-0 z-10" onClick={() => setShowColPicker(false)} />
-                  <div className="absolute right-0 top-full mt-1 z-20 bg-surface border border-border-hi rounded-lg p-2 w-[190px] shadow-lg">
-                    {ALL_COLUMNS.map(c => (
-                      <label key={c.key} className="flex items-center gap-2 px-2 py-[6px] text-xs text-t2 hover:bg-card-hover rounded cursor-pointer">
-                        <input type="checkbox" checked={exportCols.includes(c.key)} onChange={() => toggleExportCol(c.key)} />
-                        {c.label}
-                      </label>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
+            <SortControls
+              fields={SORT_FIELDS}
+              sortField={sortField} sortDir={sortDir}
+              onFieldChange={key => { setSortField(key); if (sortField2 === key) setSortField2(null) }}
+              onDirToggle={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
+              sortField2={sortField2} sortDir2={sortDir2}
+              onField2Change={setSortField2}
+              onDir2Toggle={() => setSortDir2(d => d === 'asc' ? 'desc' : 'asc')}
+            />
+
+            <ColumnPicker columns={ALL_COLUMNS} selected={exportCols} onToggle={toggleExportCol} />
 
             <button className="btn btn-sm" onClick={doExportAllCSV}>↓ CSV</button>
             <button className="btn btn-sm" onClick={doExportAllPDF}>↓ PDF</button>
@@ -384,19 +402,12 @@ export default function Dashboard({ onToast }) {
           <table className="w-full border-collapse text-xs">
             <thead>
               <tr>
-                {[
-                  { key: 'period',   label: 'Période' },
-                  { key: 'operator', label: 'Opérateur' },
-                  { key: 'entry',    label: 'Site / Entité' },
-                  { key: 'status',   label: 'Statut' },
-                  { key: 'mode',     label: 'Mode' },
-                  { key: 'payDate',  label: 'Date paiement' },
-                  { key: 'docs',     label: 'Docs' },
-                  { key: 'amount',   label: 'Montant' },
-                ].map(col => (
+                {SORT_FIELDS.map(col => (
                   <th key={col.key} onClick={() => toggleSort(col.key)}
                     className="text-left px-3 py-[10px] text-[10px] text-t3 uppercase tracking-widest border-b border-border bg-surface sticky top-0 cursor-pointer select-none hover:text-t2">
-                    {col.label}{sortField === col.key ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ''}
+                    {col.label}
+                    {sortField === col.key && (sortDir === 'asc' ? ' ▲' : ' ▼')}
+                    {sortField2 === col.key && (sortDir2 === 'asc' ? ' ²▲' : ' ²▼')}
                   </th>
                 ))}
               </tr>

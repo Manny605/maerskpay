@@ -57,7 +57,7 @@ export const ALL_COLUMNS = [
 
 const ALL_COLUMN_KEYS = ALL_COLUMNS.map(c => c.key)
 
-export function exportAllCSV(rows, columnKeys = ALL_COLUMN_KEYS) {
+export function exportAllCSV(rows, columnKeys = ALL_COLUMN_KEYS, filePrefix = 'toutes_factures') {
   const cols = ALL_COLUMNS.filter(c => columnKeys.includes(c.key))
   const headers = cols.map(c => c.label)
   const data = rows.map(row => cols.map(c => c.csv(row)))
@@ -65,18 +65,18 @@ export function exportAllCSV(rows, columnKeys = ALL_COLUMN_KEYS) {
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
   const a    = document.createElement('a')
   a.href = URL.createObjectURL(blob)
-  a.download = `toutes_factures_${new Date().toISOString().slice(0, 10)}.csv`
+  a.download = `${filePrefix}_${new Date().toISOString().slice(0, 10)}.csv`
   a.click()
   URL.revokeObjectURL(a.href)
 }
 
-export function exportAllPDF(rows, columnKeys = ALL_COLUMN_KEYS) {
+export function exportAllPDF(rows, columnKeys = ALL_COLUMN_KEYS, filePrefix = 'toutes_factures', reportTitle = `Toutes les factures (${rows.length})`) {
   import('jspdf').then(({ jsPDF }) => {
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
     doc.setFont('helvetica', 'bold'); doc.setFontSize(14)
     doc.text('MAERSK — Gestion Factures Télécom', 14, 16)
     doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(100)
-    doc.text(`Rapport — Toutes les factures (${rows.length})`, 14, 23)
+    doc.text(`Rapport — ${reportTitle}`, 14, 23)
     doc.text('Généré le : ' + new Date().toLocaleDateString('fr'), 14, 29)
     doc.setTextColor(0)
 
@@ -103,7 +103,7 @@ export function exportAllPDF(rows, columnKeys = ALL_COLUMN_KEYS) {
 
     doc.setFontSize(7); doc.setTextColor(150)
     doc.text('Maersk Mauritanie — Document confidentiel', 14, 200)
-    doc.save(`toutes_factures_${new Date().toISOString().slice(0, 10)}.pdf`)
+    doc.save(`${filePrefix}_${new Date().toISOString().slice(0, 10)}.pdf`)
   })
 }
 

@@ -48,7 +48,7 @@ export default function ConfigScreen({ onConnected, onCancel }) {
   return (
     <div className="flex items-center justify-center min-h-screen p-8 bg-bg">
       <div className="w-full max-w-md bg-surface border border-border rounded-2xl p-10">
-        <div className="font-display text-[22px] font-semibold text-navy mb-1">Maersk Telecom</div>
+        <div className="font-display text-[22px] font-semibold text-heading mb-1">Maersk Telecom</div>
         <div className="text-[11px] text-t3 mb-6">Gestion factures opérateurs — Configuration Appwrite</div>
 
         <div className="bg-card border border-border rounded-lg p-3 mb-6 text-[11px] text-t3 leading-6">
@@ -85,7 +85,7 @@ export default function ConfigScreen({ onConnected, onCancel }) {
           {loading ? 'Connexion…' : 'Connexion →'}
         </button>
 
-        {error && <div className="text-red-600 text-[11px] mt-3">{error}</div>}
+        {error && <div className="text-red-600 dark:text-red-400 text-[11px] mt-3">{error}</div>}
 
         {onCancel && (
           <button

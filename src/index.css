@@ -3,8 +3,34 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --color-bg:          245 247 250;
+    --color-surface:     255 255 255;
+    --color-card:        255 255 255;
+    --color-card-hover:  238 242 246;
+    --color-border:      223 228 234;
+    --color-border-hi:   193 201 210;
+    --color-text:        10 37 64;
+    --color-t2:          77 92 108;
+    --color-t3:          132 147 161;
+    --color-heading:     10 37 64;
+    color-scheme: light;
+  }
+  .dark {
+    --color-bg:          13 17 23;
+    --color-surface:     22 27 34;
+    --color-card:        27 33 41;
+    --color-card-hover:  36 43 52;
+    --color-border:      48 56 66;
+    --color-border-hi:   71 82 95;
+    --color-text:        228 234 240;
+    --color-t2:          166 177 189;
+    --color-t3:          115 128 142;
+    --color-heading:     214 227 240;
+    color-scheme: dark;
+  }
   body {
-    @apply bg-bg text-text font-sans;
+    @apply bg-bg text-text font-sans transition-colors duration-200;
     min-height: 100vh;
     font-size: 13.5px;
   }
@@ -17,10 +43,10 @@
   .pill {
     @apply text-[9px] px-[7px] py-[2px] rounded-full font-medium uppercase tracking-wider whitespace-nowrap border;
   }
-  .pill-missing  { @apply bg-red-50   text-red-700   border-red-200; }
-  .pill-pending  { @apply bg-amber-50 text-amber-700 border-amber-200; }
-  .pill-processing { @apply bg-blue-50 text-blue-700 border-blue-200; }
-  .pill-paid     { @apply bg-green-50 text-green-700 border-green-200; }
+  .pill-missing     { @apply bg-red-50   text-red-700   border-red-200   dark:bg-red-500/10   dark:text-red-300   dark:border-red-500/25; }
+  .pill-pending     { @apply bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/25; }
+  .pill-processing  { @apply bg-blue-50  text-blue-700  border-blue-200  dark:bg-blue-500/10  dark:text-blue-300  dark:border-blue-500/25; }
+  .pill-paid        { @apply bg-green-50 text-green-700 border-green-200 dark:bg-green-500/10 dark:text-green-300 dark:border-green-500/25; }
 
   .btn {
     @apply px-[14px] py-[7px] rounded-lg font-sans text-xs cursor-pointer

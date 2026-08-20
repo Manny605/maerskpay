@@ -1,9 +1,9 @@
 import { useEffect } from 'react'
 
 const COLORS = {
-  ok:   'bg-green-50 border-green-300 text-green-700',
-  err:  'bg-red-50 border-red-300 text-red-700',
-  info: 'bg-blue-50 border-blue-300 text-blue-700',
+  ok:   'bg-green-50 border-green-300 text-green-700 dark:bg-green-500/10 dark:border-green-500/30 dark:text-green-300',
+  err:  'bg-red-50 border-red-300 text-red-700 dark:bg-red-500/10 dark:border-red-500/30 dark:text-red-300',
+  info: 'bg-blue-50 border-blue-300 text-blue-700 dark:bg-blue-500/10 dark:border-blue-500/30 dark:text-blue-300',
 }
 
 export default function Toast({ message, type = 'info', onHide }) {
