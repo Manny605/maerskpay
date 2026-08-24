@@ -65,19 +65,19 @@ export default function App() {
   return (
     <div className="min-h-screen bg-bg text-text font-sans">
       {/* Topbar */}
-      <div className="sticky top-0 z-50 bg-surface/95 backdrop-blur-md border-b border-border flex items-center justify-between px-6 h-[52px]">
-        <span className="font-display text-[17px] font-semibold text-heading tracking-tight">
+      <div className="sticky top-0 z-50 bg-surface/95 backdrop-blur-md border-b border-border flex items-center justify-between px-3 sm:px-6 h-[52px]">
+        <span className="font-display text-[15px] sm:text-[17px] font-semibold text-heading tracking-tight truncate">
           Maersk Telecom
-          <span className="text-t3 text-[11px] font-normal font-sans ml-[10px]">Factures opérateurs</span>
+          <span className="hidden sm:inline text-t3 text-[11px] font-normal font-sans ml-[10px]">Factures opérateurs</span>
         </span>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <ThemeToggle theme={theme} onToggle={toggleTheme} />
           <button className="btn btn-sm" onClick={handleLogout}>Déconnexion</button>
         </div>
       </div>
 
       {/* Nav tabs */}
-      <div className="flex border-b border-border px-6 bg-surface">
+      <div className="flex border-b border-border px-3 sm:px-6 bg-surface">
         {[
           { id: 'dashboard', label: 'Dashboard' },
           { id: 'history',   label: 'Historique' },

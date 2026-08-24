@@ -3,6 +3,7 @@ import { getDatabases, getConfig, Query, OPERATORS, STATUS_LABELS, MONTHS, entry
 import DetailPanel from '../components/DetailPanel'
 import ColumnPicker from '../components/ColumnPicker'
 import SortControls from '../components/SortControls'
+import MonthPicker from '../components/MonthPicker'
 import { exportCSV, exportPDF, exportAllCSV, exportAllPDF, ALL_COLUMNS } from '../lib/export'
 
 const SORT_FIELDS = [
@@ -53,6 +54,7 @@ export default function Dashboard({ onToast }) {
   const [docsCache,    setDocsCache]    = useState({})
   const [loading, setLoading] = useState(false)
   const [active,  setActive]  = useState(null) // { op, entry }
+  const [focusStatus, setFocusStatus] = useState(null) // filtre rapide via les tuiles stats
   const [allRows,    setAllRows]    = useState([])
   const [loadingAll, setLoadingAll] = useState(false)
   const [statusFilter,  setStatusFilter]  = useState('')
@@ -196,6 +198,12 @@ export default function Dashboard({ onToast }) {
     })
   }
 
+  function goToMonth(m, y) {
+    setActive(null)
+    setMonth(m)
+    setYear(y)
+  }
+
   function handleSaved(savedDoc, newDocs) {
     const k = cKey(active.op.id, active.entry.id)
     setInvoiceCache(c => ({ ...c, [k]: savedDoc }))
@@ -273,7 +281,7 @@ export default function Dashboard({ onToast }) {
   }
 
   return (
-    <div className="p-6 max-w-[1200px] mx-auto">
+    <div className="p-4 sm:p-6 max-w-[1200px] mx-auto">
       {loading && (
         <div className="fixed inset-0 bg-bg/80 z-[200] flex flex-col items-center justify-center gap-3">
           <div className="w-7 h-7 border-2 border-border border-t-accent rounded-full animate-spin" />
@@ -282,13 +290,16 @@ export default function Dashboard({ onToast }) {
       )}
 
       {/* Month bar */}
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
         <div className="flex items-center gap-3">
           <button className="btn" onClick={() => changeMonth(-1)}>←</button>
-          <div className="font-display text-xl font-semibold text-heading min-w-[160px] text-center">
-            {MONTHS[month]} {year}
-          </div>
+          <MonthPicker month={month} year={year} onSelect={goToMonth} />
           <button className="btn" onClick={() => changeMonth(1)}>→</button>
+          {!isCurrentMonth && (
+            <button className="btn btn-sm" onClick={() => goToMonth(today.getMonth(), today.getFullYear())}>
+              Aujourd'hui
+            </button>
+          )}
         </div>
         <div className="flex gap-2">
           <button className="btn btn-sm" onClick={doExportCSV}>↓ CSV</button>
@@ -296,21 +307,45 @@ export default function Dashboard({ onToast }) {
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-4 gap-[10px] mb-5">
+      {/* Stats — cliquables pour filtrer la liste des opérateurs ci-dessous */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-[10px] mb-2">
         {[
-          { label: 'Factures du mois',      value: total,   sub: `${MONTHS[month]} ${year}`,                        color: 'text-text' },
-          { label: 'Non reçues',             value: missing, sub: 'à relancer opérateur',                            color: 'text-red-600 dark:text-red-400' },
-          { label: 'Reçues — non payées',    value: pending, sub: 'à régler',                                        color: 'text-amber-600 dark:text-amber-400' },
-          { label: 'Payées',                 value: paid,    sub: totalAmt > 0 ? fmtAmt(totalAmt)+' MRU' : 'ce mois-ci', color: 'text-green-600 dark:text-green-400' },
-        ].map(({ label, value, sub, color }, i) => (
-          <div key={i} className="bg-surface border border-border rounded-2xl p-4 anim-fadeup" style={{ animationDelay: `${i * 0.05}s` }}>
-            <div className="text-[10px] text-t3 uppercase tracking-widest mb-1">{label}</div>
-            <div className={`font-display text-[28px] font-semibold leading-none ${color}`}>{value}</div>
-            <div className="text-[10px] text-t3 mt-1">{sub}</div>
-          </div>
-        ))}
+          { label: 'Factures du mois',      value: total,   sub: `${MONTHS[month]} ${year}`,                        color: 'text-text',                          status: null,      icon: '📋' },
+          { label: 'Non reçues',             value: missing, sub: 'à relancer opérateur',                            color: 'text-red-600 dark:text-red-400',     status: 'missing', icon: '⚠️' },
+          { label: 'Reçues — non payées',    value: pending, sub: 'à régler',                                        color: 'text-amber-600 dark:text-amber-400', status: 'pending', icon: '⏳' },
+          { label: 'Payées',                 value: paid,    sub: totalAmt > 0 ? fmtAmt(totalAmt)+' MRU' : 'ce mois-ci', color: 'text-green-600 dark:text-green-400', status: 'paid',   icon: '✅' },
+        ].map(({ label, value, sub, color, status, icon }, i) => {
+          const isActive = status !== null && focusStatus === status
+          return (
+            <button
+              key={i}
+              type="button"
+              onClick={() => status !== null && setFocusStatus(f => f === status ? null : status)}
+              className={`text-left bg-surface border rounded-2xl p-4 anim-fadeup transition-all
+                          ${isActive ? 'border-accent ring-1 ring-accent' : 'border-border hover:border-border-hi'}
+                          ${status === null ? 'cursor-default' : 'cursor-pointer'}`}
+              style={{ animationDelay: `${i * 0.05}s` }}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[10px] text-t3 uppercase tracking-widest">{label}</span>
+                <span className="text-xs leading-none">{icon}</span>
+              </div>
+              <div className={`font-display text-[28px] font-semibold leading-none ${color}`}>{value}</div>
+              <div className="text-[10px] text-t3 mt-1">{sub}</div>
+            </button>
+          )
+        })}
       </div>
+
+      {focusStatus && (
+        <div className="flex items-center gap-2 mb-5 text-[11px] text-t3">
+          Filtré sur <span className={`pill ${STATUS_PILL[focusStatus]}`}>{STATUS_LABELS[focusStatus]}</span>
+          <span className="text-t3">
+            ({OPERATORS.reduce((n, op) => n + op.entries.filter(e => (getInv(op.id, e.id)?.status || 'missing') === focusStatus).length, 0)})
+          </span>
+          <button type="button" onClick={() => setFocusStatus(null)} className="text-accent hover:underline">Réinitialiser</button>
+        </div>
+      )}
 
       {/* Alerts */}
       {visibleAlerts.length > 0 && (
@@ -325,9 +360,18 @@ export default function Dashboard({ onToast }) {
       )}
 
       {/* Operators */}
-      <div className="grid grid-cols-3 gap-3">
+      {focusStatus && OPERATORS.every(op => op.entries.every(e => (getInv(op.id, e.id)?.status || 'missing') !== focusStatus)) ? (
+        <div className="text-center text-t3 text-xs py-8 border border-dashed border-border rounded-2xl">
+          Aucune entrée « {STATUS_LABELS[focusStatus]} » ce mois-ci.
+        </div>
+      ) : (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {OPERATORS.map((op, oi) => {
           const paidCount = op.entries.filter(e => getInv(op.id, e.id)?.status === 'paid').length
+          const visibleEntries = focusStatus
+            ? op.entries.filter(e => (getInv(op.id, e.id)?.status || 'missing') === focusStatus)
+            : op.entries
+          if (focusStatus && visibleEntries.length === 0) return null
           return (
             <div key={op.id} className="bg-surface border border-border rounded-2xl overflow-hidden anim-fadeup"
               style={{ animationDelay: `${0.08 + oi * 0.06}s` }}>
@@ -337,7 +381,7 @@ export default function Dashboard({ onToast }) {
                 <span className="text-[10px] text-t3">{paidCount}/{op.entries.length} payées</span>
               </div>
               <div className="p-2">
-                {op.entries.map(entry => {
+                {visibleEntries.map(entry => {
                   const inv    = getInv(op.id, entry.id)
                   const status = inv?.status || 'missing'
                   const docs   = getDocs(op.id, entry.id)
@@ -363,6 +407,7 @@ export default function Dashboard({ onToast }) {
           )
         })}
       </div>
+      )}
 
       {/* All invoices — exportable list */}
       <div className="bg-surface border border-border rounded-2xl overflow-hidden mt-5 anim-fadeup">
@@ -399,7 +444,7 @@ export default function Dashboard({ onToast }) {
         </div>
 
         <div className="overflow-auto max-h-[420px]">
-          <table className="w-full border-collapse text-xs">
+          <table className="w-full min-w-[760px] border-collapse text-xs">
             <thead>
               <tr>
                 {SORT_FIELDS.map(col => (

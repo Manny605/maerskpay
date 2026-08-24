@@ -157,7 +157,7 @@ export default function History({ onToast }) {
   }, [rows, docCounts, search, sortField, sortDir, sortField2, sortDir2])
 
   return (
-    <div className="p-6 max-w-[1200px] mx-auto">
+    <div className="p-4 sm:p-6 max-w-[1200px] mx-auto">
       {loading && (
         <div className="fixed inset-0 bg-bg/80 z-[200] flex flex-col items-center justify-center gap-3">
           <div className="w-7 h-7 border-2 border-border border-t-accent rounded-full animate-spin" />
@@ -206,7 +206,7 @@ export default function History({ onToast }) {
 
       {/* Table */}
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-xs">
+        <table className="w-full min-w-[760px] border-collapse text-xs">
           <thead>
             <tr>
               {HEADER_COLS.map(col => (

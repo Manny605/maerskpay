@@ -145,9 +145,9 @@ export default function DetailPanel({ op, entry, month, year, invoice, docs: ini
     >
       <div className="bg-surface border border-border-hi rounded-2xl w-full max-w-[580px] max-h-[90vh] overflow-y-auto anim-panelin">
         {/* Header */}
-        <div className="flex items-start justify-between p-5 border-b border-border">
+        <div className="flex items-start justify-between p-4 sm:p-5 border-b border-border">
           <div>
-            <div className="font-display text-[17px] font-semibold text-heading">
+            <div className="font-display text-[15px] sm:text-[17px] font-semibold text-heading">
               {op.name} · {entry.company ? `${entry.site} — ${entry.company}` : entry.site}
             </div>
             <div className="text-[11px] text-t3 mt-1">
@@ -158,8 +158,8 @@ export default function DetailPanel({ op, entry, month, year, invoice, docs: ini
         </div>
 
         {/* Body */}
-        <div className="p-5">
-          <div className="grid grid-cols-2 gap-3 mb-4">
+        <div className="p-4 sm:p-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
             <div className="flex flex-col gap-1">
               <label className="field-label">Montant (MRU)</label>
               <input className="field-input" type="number" placeholder="0.00" step="0.01" min="0"
@@ -186,7 +186,7 @@ export default function DetailPanel({ op, entry, month, year, invoice, docs: ini
               <label className="field-label">Date de paiement</label>
               <input className="field-input" type="date" value={form.payDate} onChange={set('payDate')} />
             </div>
-            <div className="flex flex-col gap-1 col-span-2">
+            <div className="flex flex-col gap-1 sm:col-span-2">
               <label className="field-label">Notes</label>
               <textarea className="field-input resize-y min-h-[60px]"
                 placeholder="Référence virement, numéro de chèque, remarques…"
@@ -222,7 +222,7 @@ export default function DetailPanel({ op, entry, month, year, invoice, docs: ini
 
             {uploading && <div className="text-[11px] text-t3 text-center py-2">Upload en cours…</div>}
 
-            <div className="grid grid-cols-3 gap-2 mt-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
               {[
                 { type: 'invoice', icon: '📄', label: 'Facture' },
                 { type: 'payment', icon: '🧾', label: 'Avis / reçu paiement' },
@@ -242,7 +242,7 @@ export default function DetailPanel({ op, entry, month, year, invoice, docs: ini
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-5 py-4 border-t border-border">
+        <div className="flex items-center justify-between flex-wrap gap-2 px-4 sm:px-5 py-4 border-t border-border">
           <div className="text-[10px] text-t3">
             {invoice ? 'Modifié : ' + new Date(invoice.$updatedAt).toLocaleString('fr') : 'Nouveau'}
           </div>

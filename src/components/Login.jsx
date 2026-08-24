@@ -26,8 +26,8 @@ export default function Login({ onLoggedIn, onOpenConfig }) {
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen p-8 bg-bg">
-      <div className="w-full max-w-md bg-surface border border-border rounded-2xl p-10">
+    <div className="flex items-center justify-center min-h-screen p-4 sm:p-8 bg-bg">
+      <div className="w-full max-w-md bg-surface border border-border rounded-2xl p-6 sm:p-10">
         <div className="font-display text-[22px] font-semibold text-heading mb-1">Maersk Telecom</div>
         <div className="text-[11px] text-t3 mb-6">Gestion factures opérateurs — Connexion</div>
 
