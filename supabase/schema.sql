@@ -1,4 +1,4 @@
--- Maersk Invoices — schéma Supabase
+-- MaerskPay — schéma Supabase
 -- À exécuter une fois dans Supabase : Dashboard → SQL Editor → New query → coller → Run
 
 -- ── Tables ──────────────────────────────────────
