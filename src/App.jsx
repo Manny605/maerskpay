@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
-import { getConfig, initClient, getCurrentUser, logout } from './lib/supabase'
+import { getCurrentUser, logout } from './lib/supabase'
 import { getInitialTheme, applyTheme } from './lib/theme'
-import ConfigScreen from './components/ConfigScreen'
 import Login from './components/Login'
 import Loading from './components/Loading'
 import Dashboard from './pages/Dashboard'
@@ -10,7 +9,7 @@ import Toast from './components/Toast'
 import ThemeToggle from './components/ThemeToggle'
 
 export default function App() {
-  const [view, setView] = useState('loading') // 'loading' | 'config' | 'login' | 'app'
+  const [view, setView] = useState('loading') // 'loading' | 'login' | 'app'
   const [tab,  setTab]  = useState('dashboard')
   const [toast, setToast] = useState({ msg: '', type: 'info' })
   const [theme, setTheme] = useState(getInitialTheme)
@@ -34,17 +33,7 @@ export default function App() {
     }
   }, [])
 
-  useEffect(() => {
-    const cfg = getConfig()
-    if (!cfg) { setView('config'); return }
-    try {
-      initClient(cfg)
-    } catch (e) {
-      setView('config')
-      return
-    }
-    checkSession()
-  }, [checkSession])
+  useEffect(() => { checkSession() }, [checkSession])
 
   async function handleLogout() {
     try { await logout() } catch (e) {}
@@ -56,8 +45,7 @@ export default function App() {
       <>
         <ThemeToggle theme={theme} onToggle={toggleTheme} className="fixed top-3 right-3 z-[400] bg-surface shadow-sm" />
         {view === 'loading' && <Loading show text="Chargement…" />}
-        {view === 'config'  && <ConfigScreen onConnected={checkSession} onCancel={getConfig() ? () => setView('login') : undefined} />}
-        {view === 'login'   && <Login onLoggedIn={() => setView('app')} onOpenConfig={() => setView('config')} />}
+        {view === 'login'   && <Login onLoggedIn={() => setView('app')} />}
       </>
     )
   }
