@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { getDatabases, getConfig, Query, OPERATORS, STATUS_LABELS, MONTHS, entryName, fmtAmt } from '../lib/appwrite'
+import { getClient, unwrap, OPERATORS, STATUS_LABELS, MONTHS, entryName, fmtAmt } from '../lib/supabase'
 import DetailPanel from '../components/DetailPanel'
 import ColumnPicker from '../components/ColumnPicker'
 import SortControls from '../components/SortControls'
@@ -71,34 +71,26 @@ export default function Dashboard({ onToast }) {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const cfg = getConfig()
-    const db  = getDatabases()
+    const db  = getClient()
     const emptyInv = {}, emptyDocs = {}
     OPERATORS.forEach(op => op.entries.forEach(e => {
       emptyInv[`${op.id}__${e.id}__${month}__${year}`]  = null
       emptyDocs[`${op.id}__${e.id}__${month}__${year}`] = []
     }))
     try {
-      const res = await db.listDocuments(cfg.databaseId, 'invoices', [
-        Query.equal('month', month),
-        Query.equal('year',  year),
-        Query.limit(25),
-      ])
+      const invoices = await unwrap(db.from('invoices').select('*').eq('month', month).eq('year', year))
       const ids = []
-      res.documents.forEach(doc => {
+      invoices.forEach(doc => {
         const k = `${doc.operator_id}__${doc.entry_id}__${doc.month}__${doc.year}`
         emptyInv[k] = doc
-        ids.push(doc.$id)
+        ids.push(doc.id)
       })
       if (ids.length > 0) {
-        const dRes = await db.listDocuments(cfg.databaseId, 'invoice_docs', [
-          Query.equal('invoice_id', ids),
-          Query.limit(100),
-        ])
-        dRes.documents.forEach(d => {
+        const docs = await unwrap(db.from('invoice_docs').select('*').in('invoice_id', ids))
+        docs.forEach(d => {
           OPERATORS.forEach(op => op.entries.forEach(e => {
             const k = `${op.id}__${e.id}__${month}__${year}`
-            if (emptyInv[k]?.$id === d.invoice_id) {
+            if (emptyInv[k]?.id === d.invoice_id) {
               emptyDocs[k] = [...(emptyDocs[k] || []), d]
             }
           }))
@@ -107,7 +99,7 @@ export default function Dashboard({ onToast }) {
       setInvoiceCache({ ...emptyInv })
       setDocsCache({ ...emptyDocs })
     } catch (e) {
-      if (e.code !== 404) onToast('Erreur chargement : ' + e.message, 'err')
+      onToast('Erreur chargement : ' + e.message, 'err')
       setInvoiceCache({ ...emptyInv })
       setDocsCache({ ...emptyDocs })
     } finally {
@@ -119,34 +111,27 @@ export default function Dashboard({ onToast }) {
 
   const loadAll = useCallback(async () => {
     setLoadingAll(true)
-    const cfg = getConfig()
-    const db  = getDatabases()
+    const db  = getClient()
     try {
-      const res = await db.listDocuments(cfg.databaseId, 'invoices', [
-        Query.orderDesc('year'),
-        Query.limit(500),
-      ])
+      const invoices = await unwrap(db.from('invoices').select('*').order('year', { ascending: false }).limit(500))
       const docsByInvoice = {}
-      if (res.documents.length > 0) {
-        const dRes = await db.listDocuments(cfg.databaseId, 'invoice_docs', [
-          Query.equal('invoice_id', res.documents.map(d => d.$id)),
-          Query.limit(500),
-        ])
-        dRes.documents.forEach(d => {
+      if (invoices.length > 0) {
+        const docs = await unwrap(db.from('invoice_docs').select('*').in('invoice_id', invoices.map(d => d.id)))
+        docs.forEach(d => {
           docsByInvoice[d.invoice_id] = [...(docsByInvoice[d.invoice_id] || []), d]
         })
       }
-      const rows = res.documents
+      const rows = invoices
         .slice()
         .sort((a, b) => b.year - a.year || b.month - a.month)
         .map(inv => {
           const op = OPERATORS.find(o => o.id === inv.operator_id)
           const e  = op?.entries.find(x => x.id === inv.entry_id)
-          return { op, e, inv, docs: docsByInvoice[inv.$id] || [] }
+          return { op, e, inv, docs: docsByInvoice[inv.id] || [] }
         })
       setAllRows(rows)
     } catch (e) {
-      if (e.code !== 404) onToast('Erreur chargement liste globale : ' + e.message, 'err')
+      onToast('Erreur chargement liste globale : ' + e.message, 'err')
       setAllRows([])
     } finally {
       setLoadingAll(false)
@@ -245,7 +230,7 @@ export default function Dashboard({ onToast }) {
   const ALERT_STYLE = {
     danger:  'bg-red-50 border-red-200 text-red-700 dark:bg-red-500/10 dark:border-red-500/25 dark:text-red-300',
     warning: 'bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-500/10 dark:border-amber-500/25 dark:text-amber-300',
-    info:    'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-500/10 dark:border-blue-500/25 dark:text-blue-300',
+    info:    'bg-cyan-50 border-cyan-200 text-cyan-700 dark:bg-cyan-500/10 dark:border-cyan-500/25 dark:text-cyan-300',
   }
 
   function doExportCSV() {
@@ -463,7 +448,7 @@ export default function Dashboard({ onToast }) {
               ) : sortedFilteredRows.length === 0 ? (
                 <tr><td colSpan={8} className="text-center text-t3 py-8">Aucune facture enregistrée.</td></tr>
               ) : sortedFilteredRows.map(({ op, e, inv, docs }) => (
-                <tr key={inv.$id} className="hover:bg-card border-b border-border">
+                <tr key={inv.id} className="hover:bg-card border-b border-border">
                   <td className="px-3 py-[10px] text-t2">{MONTHS[inv.month]} {inv.year}</td>
                   <td className={`px-3 py-[10px] font-medium ${OP_NAME_COLOR[inv.operator_id] || ''}`}>{op?.name || inv.operator_id}</td>
                   <td className="px-3 py-[10px] text-t2">{e ? entryName(e) : inv.entry_id}</td>

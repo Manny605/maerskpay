@@ -22,12 +22,14 @@ export default {
         't2':         'rgb(var(--color-t2) / <alpha-value>)',
         't3':         'rgb(var(--color-t3) / <alpha-value>)',
         heading:      'rgb(var(--color-heading) / <alpha-value>)',
+        // Cyan du logo, assombri en clair / éclairci en sombre pour rester lisible en texte
+        accent:       'rgb(var(--color-accent) / <alpha-value>)',
         // Brand colors stay constant across themes.
         mauritel: '#0f9d70',
         rimatel:  '#2f6fed',
         mattel:   '#e15a2e',
-        accent:   '#1f8fc4',
-        navy:     '#0a2540',
+        brand:    '#1eaec8', // cyan exact du logo — pour les aplats (boutons, sélection)
+        navy:     '#00243d', // texte posé sur brand
       },
     },
   },

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { MONTHS } from '../lib/appwrite'
+import { MONTHS } from '../lib/supabase'
 
 const MONTHS_SHORT = MONTHS.map(m => m.slice(0, 3))
 
@@ -53,7 +53,7 @@ export default function MonthPicker({ month, year, onSelect }) {
                     type="button"
                     onClick={() => pick(i)}
                     className={`relative text-[11px] px-1 py-[6px] rounded-lg transition-colors ${
-                      isSelected ? 'bg-accent text-white font-medium' : 'text-t2 hover:bg-card-hover'
+                      isSelected ? 'bg-brand text-navy font-semibold' : 'text-t2 hover:bg-card-hover'
                     }`}
                   >
                     {m}

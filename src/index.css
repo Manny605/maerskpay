@@ -4,29 +4,31 @@
 
 @layer base {
   :root {
-    --color-bg:          245 247 250;
+    --color-bg:          242 247 249;
     --color-surface:     255 255 255;
     --color-card:        255 255 255;
-    --color-card-hover:  238 242 246;
-    --color-border:      223 228 234;
-    --color-border-hi:   193 201 210;
-    --color-text:        10 37 64;
-    --color-t2:          77 92 108;
-    --color-t3:          132 147 161;
-    --color-heading:     10 37 64;
+    --color-card-hover:  233 244 247;
+    --color-border:      217 229 235;
+    --color-border-hi:   184 204 214;
+    --color-text:        0 36 61;
+    --color-t2:          68 94 113;
+    --color-t3:          117 141 157;
+    --color-heading:     0 36 61;
+    --color-accent:      8 118 139;
     color-scheme: light;
   }
   .dark {
-    --color-bg:          13 17 23;
-    --color-surface:     22 27 34;
-    --color-card:        27 33 41;
-    --color-card-hover:  36 43 52;
-    --color-border:      48 56 66;
-    --color-border-hi:   71 82 95;
-    --color-text:        228 234 240;
-    --color-t2:          166 177 189;
-    --color-t3:          115 128 142;
-    --color-heading:     214 227 240;
+    --color-bg:          5 19 30;
+    --color-surface:     10 29 44;
+    --color-card:        14 36 53;
+    --color-card-hover:  21 46 66;
+    --color-border:      32 57 77;
+    --color-border-hi:   52 81 103;
+    --color-text:        226 236 242;
+    --color-t2:          160 182 197;
+    --color-t3:          113 138 155;
+    --color-heading:     214 234 243;
+    --color-accent:      72 200 222;
     color-scheme: dark;
   }
   body {
@@ -45,7 +47,7 @@
   }
   .pill-missing     { @apply bg-red-50   text-red-700   border-red-200   dark:bg-red-500/10   dark:text-red-300   dark:border-red-500/25; }
   .pill-pending     { @apply bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/25; }
-  .pill-processing  { @apply bg-blue-50  text-blue-700  border-blue-200  dark:bg-blue-500/10  dark:text-blue-300  dark:border-blue-500/25; }
+  .pill-processing  { @apply bg-cyan-50  text-cyan-700  border-cyan-200  dark:bg-cyan-500/10  dark:text-cyan-300  dark:border-cyan-500/25; }
   .pill-paid        { @apply bg-green-50 text-green-700 border-green-200 dark:bg-green-500/10 dark:text-green-300 dark:border-green-500/25; }
 
   .btn {
@@ -54,9 +56,10 @@
   }
   .btn:hover { @apply border-border-hi text-text; }
   .btn-accent {
-    @apply bg-navy text-white border-navy font-medium;
+    @apply bg-brand text-navy border-brand font-semibold;
   }
-  .btn-accent:hover { @apply opacity-85; }
+  .btn-accent:hover { @apply brightness-95 text-navy border-brand; }
+  .btn-accent:disabled { @apply opacity-60 cursor-not-allowed; }
   .btn-sm { @apply px-[10px] py-[4px] text-[11px]; }
 
   .field-label {

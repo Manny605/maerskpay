@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
-import { getConfig, initClient, getCurrentUser, logout } from './lib/appwrite'
+import { getConfig, initClient, getCurrentUser, logout } from './lib/supabase'
 import { getInitialTheme, applyTheme } from './lib/theme'
 import ConfigScreen from './components/ConfigScreen'
 import Login from './components/Login'
@@ -65,8 +65,9 @@ export default function App() {
   return (
     <div className="min-h-screen bg-bg text-text font-sans">
       {/* Topbar */}
-      <div className="sticky top-0 z-50 bg-surface/95 backdrop-blur-md border-b border-border flex items-center justify-between px-3 sm:px-6 h-[52px]">
-        <span className="font-display text-[15px] sm:text-[17px] font-semibold text-heading tracking-tight truncate">
+      <div className="sticky top-0 z-50 bg-surface/95 backdrop-blur-md border-t-[3px] border-t-brand border-b border-border flex items-center justify-between px-3 sm:px-6 h-[52px]">
+        <span className="flex items-center gap-2 font-display text-[15px] sm:text-[17px] font-semibold text-heading tracking-tight truncate">
+          <img src="/logo.png" alt="" className="w-7 h-7 shrink-0" />
           Maersk Telecom
           <span className="hidden sm:inline text-t3 text-[11px] font-normal font-sans ml-[10px]">Factures opérateurs</span>
         </span>

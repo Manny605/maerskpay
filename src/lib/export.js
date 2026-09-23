@@ -1,4 +1,4 @@
-import { MONTHS, STATUS_LABELS, entryName, fmtAmt } from './appwrite'
+import { MONTHS, STATUS_LABELS, entryName, fmtAmt } from './supabase'
 
 export function exportCSV(rows, month, year) {
   const headers = ['Opérateur','Site/Entité','Mois','Année','Statut','Montant (MRU)','Mode paiement','Date paiement','Nb documents','Notes']
