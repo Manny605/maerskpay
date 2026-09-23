@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { getDatabases, getConfig, Query, OPERATORS, STATUS_LABELS, MONTHS, entryName, fmtAmt } from '../lib/appwrite'
+import { getClient, unwrap, OPERATORS, STATUS_LABELS, MONTHS, entryName, fmtAmt } from '../lib/supabase'
 import ColumnPicker from '../components/ColumnPicker'
 import SortControls from '../components/SortControls'
 import { exportAllCSV, exportAllPDF, ALL_COLUMNS } from '../lib/export'
@@ -51,28 +51,22 @@ export default function History({ onToast }) {
 
   async function load() {
     setLoading(true)
-    const cfg = getConfig()
-    const db  = getDatabases()
+    const db  = getClient()
     try {
-      const queries = [
-        Query.equal('year', yearFilter),
-        Query.orderDesc('month'),
-        Query.limit(100),
-      ]
-      if (opFilter)     queries.push(Query.equal('operator_id', opFilter))
-      if (statusFilter) queries.push(Query.equal('status', statusFilter))
+      let query = db.from('invoices').select('*')
+        .eq('year', yearFilter)
+        .order('month', { ascending: false })
+        .limit(100)
+      if (opFilter)     query = query.eq('operator_id', opFilter)
+      if (statusFilter) query = query.eq('status', statusFilter)
 
-      const res = await db.listDocuments(cfg.databaseId, 'invoices', queries)
-      setRows(res.documents)
+      const invoices = await unwrap(query)
+      setRows(invoices)
 
-      if (res.documents.length > 0) {
-        const ids = res.documents.map(r => r.$id)
-        const dRes = await db.listDocuments(cfg.databaseId, 'invoice_docs', [
-          Query.equal('invoice_id', ids.slice(0, 25)),
-          Query.limit(200),
-        ])
+      if (invoices.length > 0) {
+        const docs = await unwrap(db.from('invoice_docs').select('invoice_id').in('invoice_id', invoices.map(r => r.id)))
         const counts = {}
-        dRes.documents.forEach(d => { counts[d.invoice_id] = (counts[d.invoice_id] || 0) + 1 })
+        docs.forEach(d => { counts[d.invoice_id] = (counts[d.invoice_id] || 0) + 1 })
         setDocCounts(counts)
       } else {
         setDocCounts({})
@@ -123,7 +117,7 @@ export default function History({ onToast }) {
     let list = rows.map(row => {
       const op    = OPERATORS.find(o => o.id === row.operator_id)
       const entry = op?.entries.find(e => e.id === row.entry_id)
-      return { row, op, entry, docCount: docCounts[row.$id] || 0 }
+      return { row, op, entry, docCount: docCounts[row.id] || 0 }
     })
 
     if (search.trim()) {
@@ -223,7 +217,7 @@ export default function History({ onToast }) {
             {displayRows.length === 0 ? (
               <tr><td colSpan={8} className="text-center text-t3 py-8">Aucune facture pour cette période.</td></tr>
             ) : displayRows.map(({ row, op, entry, docCount }) => (
-              <tr key={row.$id} className="hover:bg-card border-b border-border">
+              <tr key={row.id} className="hover:bg-card border-b border-border">
                 <td className="px-3 py-[10px] text-t2">{MONTHS[row.month]} {row.year}</td>
                 <td className={`px-3 py-[10px] font-medium ${OP_COLOR[row.operator_id]}`}>{op?.name || row.operator_id}</td>
                 <td className="px-3 py-[10px] text-t2">{entry ? entryName(entry) : row.entry_id}</td>

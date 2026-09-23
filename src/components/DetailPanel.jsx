@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
-import { getDatabases, getStorage, getConfig, ID, DOC_LABELS, fmtAmt, STATUS_LABELS, docId } from '../lib/appwrite'
+import { getClient, getConfig, unwrap, DOC_LABELS, fmtAmt, STATUS_LABELS, docId } from '../lib/supabase'
 
 const DOC_PILL = {
-  invoice: 'text-blue-700 bg-blue-50 dark:text-blue-300 dark:bg-blue-500/15',
+  invoice: 'text-cyan-700 bg-cyan-50 dark:text-cyan-300 dark:bg-cyan-500/15',
   payment: 'text-green-700 bg-green-50 dark:text-green-300 dark:bg-green-500/15',
   cheque:  'text-amber-700 bg-amber-50 dark:text-amber-300 dark:bg-amber-500/15',
 }
@@ -18,7 +18,7 @@ export default function DetailPanel({ op, entry, month, year, invoice, docs: ini
   const [docs, setDocs]       = useState(initialDocs || [])
   const [saving, setSaving]   = useState(false)
   const [uploading, setUploading] = useState(false)
-  const [invoiceId, setInvoiceId] = useState(invoice?.$id || null)
+  const [invoiceId, setInvoiceId] = useState(invoice?.id || null)
 
   const cfg = getConfig()
   const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }))
@@ -31,8 +31,9 @@ export default function DetailPanel({ op, entry, month, year, invoice, docs: ini
 
   async function save() {
     setSaving(true)
-    const db = getDatabases()
+    const db = getClient()
     const payload = {
+      id:          docId(op.id, entry.id, month, year),
       operator_id: op.id,
       entry_id:    entry.id,
       month,
@@ -44,15 +45,8 @@ export default function DetailPanel({ op, entry, month, year, invoice, docs: ini
       notes:    form.notes   || null,
     }
     try {
-      const id = docId(op.id, entry.id, month, year)
-      let saved
-      try {
-        saved = await db.updateDocument(cfg.databaseId, 'invoices', id, payload)
-      } catch (e) {
-        if (e.code === 404) saved = await db.createDocument(cfg.databaseId, 'invoices', id, payload)
-        else throw e
-      }
-      setInvoiceId(saved.$id)
+      const saved = await unwrap(db.from('invoices').upsert(payload).select().single())
+      setInvoiceId(saved.id)
       onSaved(saved, docs)
       onClose()
     } catch (e) {
@@ -64,25 +58,21 @@ export default function DetailPanel({ op, entry, month, year, invoice, docs: ini
 
   async function ensureInvoice() {
     if (invoiceId) return invoiceId
-    const db = getDatabases()
+    const db = getClient()
     const id = docId(op.id, entry.id, month, year)
     const payload = {
-      operator_id: op.id, entry_id: entry.id,
+      id, operator_id: op.id, entry_id: entry.id,
       month, year, status: form.status,
       amount: parseFloat(form.amount) || null,
       pay_mode: form.payMode || null,
       pay_date: form.payDate || null,
       notes: form.notes || null,
     }
-    try {
-      const saved = await db.createDocument(cfg.databaseId, 'invoices', id, payload)
-      setInvoiceId(saved.$id)
-      onSaved(saved, docs)
-      return saved.$id
-    } catch (e) {
-      if (e.code === 409) { setInvoiceId(id); return id }
-      throw e
-    }
+    // ignoreDuplicates : si la facture existe déjà, on ne l'écrase pas (aucune ligne renvoyée)
+    const rows = await unwrap(db.from('invoices').upsert(payload, { ignoreDuplicates: true }).select())
+    if (rows[0]) onSaved(rows[0], docs)
+    setInvoiceId(id)
+    return id
   }
 
   async function handleUpload(e, docType) {
@@ -92,17 +82,19 @@ export default function DetailPanel({ op, entry, month, year, invoice, docs: ini
     setUploading(true)
     try {
       const iid = await ensureInvoice()
-      const storage = getStorage()
-      const db      = getDatabases()
-      const fileRes = await storage.createFile(cfg.bucketId, ID.unique(), file)
-      const docRec  = await db.createDocument(cfg.databaseId, 'invoice_docs', ID.unique(), {
+      const db   = getClient()
+      // Chemin ASCII (Supabase refuse accents/espaces) — le nom d'origine reste dans file_name
+      const ext  = file.name.includes('.') ? file.name.split('.').pop().toLowerCase() : 'bin'
+      const path = `${iid}/${crypto.randomUUID()}.${ext}`
+      await unwrap(db.storage.from(cfg.bucketId).upload(path, file, { contentType: file.type }))
+      const docRec = await unwrap(db.from('invoice_docs').insert({
         invoice_id: iid,
         doc_type:   docType,
         file_name:  file.name,
-        file_id:    fileRes.$id,
+        file_id:    path,
         file_size:  file.size,
         mime_type:  file.type,
-      })
+      }).select().single())
       setDocs(d => [...d, docRec])
     } catch (err) {
       alert('Erreur upload : ' + err.message)
@@ -111,28 +103,41 @@ export default function DetailPanel({ op, entry, month, year, invoice, docs: ini
     }
   }
 
-  function openDoc(fileId) {
-    const storage = getStorage()
-    const url = storage.getFileView(cfg.bucketId, fileId)
-    window.open(url.toString(), '_blank')
+  // Bucket privé : on génère une URL signée valable 1 h
+  async function signedUrl(fileId, opts) {
+    const { signedUrl } = await unwrap(getClient().storage.from(cfg.bucketId).createSignedUrl(fileId, 3600, opts))
+    return signedUrl
   }
 
-  function downloadDoc(fileId, fileName) {
-    const storage = getStorage()
-    const url = storage.getFileDownload(cfg.bucketId, fileId)
-    const a = document.createElement('a')
-    a.href = url.toString(); a.download = fileName; a.target = '_blank'
-    document.body.appendChild(a); a.click(); document.body.removeChild(a)
+  async function openDoc(fileId) {
+    // Ouvre l'onglet tout de suite (sinon bloqué par le navigateur après l'await)
+    const win = window.open('', '_blank')
+    try {
+      win.location.href = await signedUrl(fileId)
+    } catch (err) {
+      win.close()
+      alert('Erreur ouverture : ' + err.message)
+    }
+  }
+
+  async function downloadDoc(fileId, fileName) {
+    try {
+      const url = await signedUrl(fileId, { download: fileName })
+      const a = document.createElement('a')
+      a.href = url; a.download = fileName
+      document.body.appendChild(a); a.click(); document.body.removeChild(a)
+    } catch (err) {
+      alert('Erreur téléchargement : ' + err.message)
+    }
   }
 
   async function deleteDoc(docId, fileId) {
     if (!confirm('Supprimer ce document ?')) return
     try {
-      const storage = getStorage()
-      const db      = getDatabases()
-      await storage.deleteFile(cfg.bucketId, fileId)
-      await db.deleteDocument(cfg.databaseId, 'invoice_docs', docId)
-      setDocs(d => d.filter(x => x.$id !== docId))
+      const db = getClient()
+      await unwrap(db.storage.from(cfg.bucketId).remove([fileId]))
+      await unwrap(db.from('invoice_docs').delete().eq('id', docId))
+      setDocs(d => d.filter(x => x.id !== docId))
     } catch (err) {
       alert('Erreur suppression : ' + err.message)
     }
@@ -202,7 +207,7 @@ export default function DetailPanel({ op, entry, month, year, invoice, docs: ini
             ) : (
               <div className="flex flex-col gap-2 mb-2">
                 {docs.map(d => (
-                  <div key={d.$id} className="flex items-center justify-between px-[10px] py-2 bg-card rounded-lg border border-border">
+                  <div key={d.id} className="flex items-center justify-between px-[10px] py-2 bg-card rounded-lg border border-border">
                     <div className="flex items-center gap-2 min-w-0">
                       <span>📄</span>
                       <span className="text-[11px] text-text truncate max-w-[180px]" title={d.file_name}>{d.file_name}</span>
@@ -213,7 +218,7 @@ export default function DetailPanel({ op, entry, month, year, invoice, docs: ini
                     <div className="flex gap-1">
                       <button onClick={() => openDoc(d.file_id)} className="text-t3 hover:text-text text-xs px-1 py-1 rounded hover:bg-border transition-colors" title="Ouvrir">👁</button>
                       <button onClick={() => downloadDoc(d.file_id, d.file_name)} className="text-t3 hover:text-text text-xs px-1 py-1 rounded hover:bg-border transition-colors" title="Télécharger">↓</button>
-                      <button onClick={() => deleteDoc(d.$id, d.file_id)} className="text-red-500 hover:text-red-700 text-xs px-1 py-1 rounded hover:bg-border transition-colors" title="Supprimer">×</button>
+                      <button onClick={() => deleteDoc(d.id, d.file_id)} className="text-red-500 hover:text-red-700 text-xs px-1 py-1 rounded hover:bg-border transition-colors" title="Supprimer">×</button>
                     </div>
                   </div>
                 ))}
@@ -244,7 +249,7 @@ export default function DetailPanel({ op, entry, month, year, invoice, docs: ini
         {/* Footer */}
         <div className="flex items-center justify-between flex-wrap gap-2 px-4 sm:px-5 py-4 border-t border-border">
           <div className="text-[10px] text-t3">
-            {invoice ? 'Modifié : ' + new Date(invoice.$updatedAt).toLocaleString('fr') : 'Nouveau'}
+            {invoice ? 'Modifié : ' + new Date(invoice.updated_at).toLocaleString('fr') : 'Nouveau'}
           </div>
           <div className="flex gap-2">
             <button className="btn" onClick={onClose}>Annuler</button>

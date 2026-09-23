@@ -1,21 +1,12 @@
 import { useState } from 'react'
-import { initClient, saveConfig, getConfig } from '../lib/appwrite'
-import { Query } from 'appwrite'
-
-const DEFAULT_CONFIG = {
-  endpoint:   'https://fra.cloud.appwrite.io/v1',
-  projectId:  '6a541d570015fc3d18cc',
-  databaseId: '6a541f6000166ea3785e',
-  bucketId:   '6a5431580032f1e6d98c',
-}
+import { initClient, saveConfig, getConfig, unwrap, DEFAULT_CONFIG } from '../lib/supabase'
 
 export default function ConfigScreen({ onConnected, onCancel }) {
   const saved = getConfig() || {}
   const [form, setForm] = useState({
-    endpoint:   saved.endpoint   || DEFAULT_CONFIG.endpoint,
-    projectId:  saved.projectId  || DEFAULT_CONFIG.projectId,
-    databaseId: saved.databaseId || DEFAULT_CONFIG.databaseId,
-    bucketId:   saved.bucketId   || DEFAULT_CONFIG.bucketId,
+    url:      saved.url      || DEFAULT_CONFIG.url,
+    anonKey:  saved.anonKey  || DEFAULT_CONFIG.anonKey,
+    bucketId: saved.bucketId || DEFAULT_CONFIG.bucketId,
   })
   const [error, setError]     = useState('')
   const [loading, setLoading] = useState(false)
@@ -23,19 +14,16 @@ export default function ConfigScreen({ onConnected, onCancel }) {
   const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }))
 
   async function connect() {
-    if (!form.projectId || !form.databaseId || !form.bucketId) {
+    if (!form.url || !form.anonKey || !form.bucketId) {
       setError('Tous les champs sont requis.')
       return
     }
     setLoading(true)
     setError('')
     try {
-      const { databases } = initClient(form)
-      try {
-        await databases.listDocuments(form.databaseId, 'invoices', [Query.limit(1)])
-      } catch (e) {
-        if (e.code !== 404 && e.code !== 401) throw e
-      }
+      const client = initClient(form)
+      // Vérifie que l'URL et la clé sont valides (RLS renvoie simplement 0 ligne si non connecté)
+      await unwrap(client.from('invoices').select('id').limit(1))
       saveConfig(form)
       onConnected()
     } catch (e) {
@@ -47,28 +35,28 @@ export default function ConfigScreen({ onConnected, onCancel }) {
 
   return (
     <div className="flex items-center justify-center min-h-screen p-4 sm:p-8 bg-bg">
-      <div className="w-full max-w-md bg-surface border border-border rounded-2xl p-6 sm:p-10">
+      <div className="w-full max-w-md bg-surface border border-border border-t-4 border-t-brand rounded-2xl p-6 sm:p-10 shadow-sm">
+        <img src="/logo.png" alt="Maersk" className="w-12 h-12 mb-4" />
         <div className="font-display text-[22px] font-semibold text-heading mb-1">Maersk Telecom</div>
-        <div className="text-[11px] text-t3 mb-6">Gestion factures opérateurs — Configuration Appwrite</div>
+        <div className="text-[11px] text-t3 mb-6">Gestion factures opérateurs — Configuration Supabase</div>
 
         <div className="bg-card border border-border rounded-lg p-3 mb-6 text-[11px] text-t3 leading-6">
-          <a href="https://cloud.appwrite.io" target="_blank" rel="noreferrer" className="text-accent">
-            cloud.appwrite.io
+          <a href="https://supabase.com/dashboard" target="_blank" rel="noreferrer" className="text-accent">
+            supabase.com/dashboard
           </a>{' '}
-          → ton projet → <strong className="text-t2">Settings → General</strong> pour le Project ID.
+          → ton projet → <strong className="text-t2">Project Settings → API</strong> pour l'URL et la clé anon.
         </div>
 
         {[
-          { key: 'endpoint',   label: 'Endpoint',          ph: 'https://cloud.appwrite.io/v1' },
-          { key: 'projectId',  label: 'Project ID',        ph: '6a541d570015fc3d18cc' },
-          { key: 'databaseId', label: 'Database ID',       ph: 'maerskpay-db' },
-          { key: 'bucketId',   label: 'Storage Bucket ID', ph: '6a5431580032f1e6d98c' },
+          { key: 'url',      label: 'Project URL',    ph: 'https://xxxx.supabase.co' },
+          { key: 'anonKey',  label: 'Anon key',       ph: 'eyJhbGciOi…' },
+          { key: 'bucketId', label: 'Storage bucket', ph: 'maersk-docs' },
         ].map(({ key, label, ph }) => (
           <div key={key} className="flex flex-col gap-1 mb-3">
             <label className="field-label">{label}</label>
             <input
               className="field-input"
-              type={key.includes('Key') || key === 'bucketId' ? 'text' : 'text'}
+              type="text"
               placeholder={ph}
               value={form[key]}
               onChange={set(key)}

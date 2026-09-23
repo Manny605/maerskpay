@@ -1,19 +1,22 @@
-import { Client, Databases, Storage, Account, Query, ID } from 'appwrite'
+import { createClient } from '@supabase/supabase-js'
 
-export { Query, ID }
+const LS_KEY = 'msktlc_supabase_cfg'
 
-const LS_KEY = 'msktlc_appwrite_cfg'
+// Valeurs par défaut lues depuis .env (VITE_SUPABASE_*) — surchargeables via l'écran de config
+export const DEFAULT_CONFIG = {
+  url:      import.meta.env.VITE_SUPABASE_URL      || '',
+  anonKey:  import.meta.env.VITE_SUPABASE_ANON_KEY || '',
+  bucketId: import.meta.env.VITE_SUPABASE_BUCKET   || 'maersk-docs',
+}
 
-let _client    = null
-let _databases = null
-let _storage   = null
-let _account   = null
-let _cfg       = null
+let _client = null
+let _cfg    = null
 
 export function getConfig() {
   if (_cfg) return _cfg
   const saved = localStorage.getItem(LS_KEY)
-  return saved ? JSON.parse(saved) : null
+  if (saved) return JSON.parse(saved)
+  return DEFAULT_CONFIG.url && DEFAULT_CONFIG.anonKey ? DEFAULT_CONFIG : null
 }
 
 export function saveConfig(cfg) {
@@ -23,32 +26,36 @@ export function saveConfig(cfg) {
 
 export function clearConfig() {
   localStorage.removeItem(LS_KEY)
-  _client = _databases = _storage = _account = _cfg = null
+  _client = _cfg = null
 }
 
 export function initClient(cfg) {
-  _cfg = cfg
-  _client    = new Client().setEndpoint(cfg.endpoint).setProject(cfg.projectId)
-  _databases = new Databases(_client)
-  _storage   = new Storage(_client)
-  _account   = new Account(_client)
-  return { databases: _databases, storage: _storage, account: _account }
+  _cfg    = cfg
+  _client = createClient(cfg.url, cfg.anonKey)
+  return _client
 }
 
-export function getDatabases() { return _databases }
-export function getStorage()   { return _storage }
-export function getAccount()   { return _account }
+export function getClient() { return _client }
+
+// Renvoie data ou lève l'erreur Supabase — évite de répéter { data, error } partout
+export async function unwrap(promise) {
+  const { data, error } = await promise
+  if (error) throw error
+  return data
+}
 
 export async function login(email, password) {
-  return _account.createEmailPasswordSession(email, password)
+  return unwrap(_client.auth.signInWithPassword({ email, password }))
 }
 
 export async function logout() {
-  await _account.deleteSession('current')
+  await unwrap(_client.auth.signOut())
 }
 
 export async function getCurrentUser() {
-  return _account.get()
+  const { user } = await unwrap(_client.auth.getUser())
+  if (!user) throw new Error('Non connecté')
+  return user
 }
 
 // ── OPERATORS & ENTRIES ─────────────────────────
