@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getClient, getConfig, unwrap, DOC_LABELS, fmtAmt, STATUS_LABELS, docId } from '../lib/supabase'
+import { getClient, unwrap, BUCKET, DOC_LABELS, fmtAmt, STATUS_LABELS, docId } from '../lib/supabase'
 
 const DOC_PILL = {
   invoice: 'text-cyan-700 bg-cyan-50 dark:text-cyan-300 dark:bg-cyan-500/15',
@@ -20,7 +20,6 @@ export default function DetailPanel({ op, entry, month, year, invoice, docs: ini
   const [uploading, setUploading] = useState(false)
   const [invoiceId, setInvoiceId] = useState(invoice?.id || null)
 
-  const cfg = getConfig()
   const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }))
 
   useEffect(() => {
@@ -86,7 +85,7 @@ export default function DetailPanel({ op, entry, month, year, invoice, docs: ini
       // Chemin ASCII (Supabase refuse accents/espaces) — le nom d'origine reste dans file_name
       const ext  = file.name.includes('.') ? file.name.split('.').pop().toLowerCase() : 'bin'
       const path = `${iid}/${crypto.randomUUID()}.${ext}`
-      await unwrap(db.storage.from(cfg.bucketId).upload(path, file, { contentType: file.type }))
+      await unwrap(db.storage.from(BUCKET).upload(path, file, { contentType: file.type }))
       const docRec = await unwrap(db.from('invoice_docs').insert({
         invoice_id: iid,
         doc_type:   docType,
@@ -105,7 +104,7 @@ export default function DetailPanel({ op, entry, month, year, invoice, docs: ini
 
   // Bucket privé : on génère une URL signée valable 1 h
   async function signedUrl(fileId, opts) {
-    const { signedUrl } = await unwrap(getClient().storage.from(cfg.bucketId).createSignedUrl(fileId, 3600, opts))
+    const { signedUrl } = await unwrap(getClient().storage.from(BUCKET).createSignedUrl(fileId, 3600, opts))
     return signedUrl
   }
 
@@ -135,7 +134,7 @@ export default function DetailPanel({ op, entry, month, year, invoice, docs: ini
     if (!confirm('Supprimer ce document ?')) return
     try {
       const db = getClient()
-      await unwrap(db.storage.from(cfg.bucketId).remove([fileId]))
+      await unwrap(db.storage.from(BUCKET).remove([fileId]))
       await unwrap(db.from('invoice_docs').delete().eq('id', docId))
       setDocs(d => d.filter(x => x.id !== docId))
     } catch (err) {

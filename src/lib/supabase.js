@@ -1,39 +1,13 @@
 import { createClient } from '@supabase/supabase-js'
 
-const LS_KEY = 'msktlc_supabase_cfg'
+// Clé anon publique : elle est faite pour être dans le front, les données sont protégées par RLS.
+// Ne JAMAIS mettre la clé service_role ici.
+const SUPABASE_URL      = 'https://ckgpqdwazkgudpbejgbc.supabase.co'
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNrZ3BxZHdhemtndWRwYmVqZ2JjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAxODUxODYsImV4cCI6MjEwNTc2MTE4Nn0.-zPoUen1n6RJWEObOBoQLsAbeIaH2uSAx6myWhbcITo'
 
-// Valeurs par défaut lues depuis .env (VITE_SUPABASE_*) — surchargeables via l'écran de config
-export const DEFAULT_CONFIG = {
-  url:      import.meta.env.VITE_SUPABASE_URL      || '',
-  anonKey:  import.meta.env.VITE_SUPABASE_ANON_KEY || '',
-  bucketId: import.meta.env.VITE_SUPABASE_BUCKET   || 'maersk-docs',
-}
+export const BUCKET = 'maersk-docs'
 
-let _client = null
-let _cfg    = null
-
-export function getConfig() {
-  if (_cfg) return _cfg
-  const saved = localStorage.getItem(LS_KEY)
-  if (saved) return JSON.parse(saved)
-  return DEFAULT_CONFIG.url && DEFAULT_CONFIG.anonKey ? DEFAULT_CONFIG : null
-}
-
-export function saveConfig(cfg) {
-  localStorage.setItem(LS_KEY, JSON.stringify(cfg))
-  _cfg = cfg
-}
-
-export function clearConfig() {
-  localStorage.removeItem(LS_KEY)
-  _client = _cfg = null
-}
-
-export function initClient(cfg) {
-  _cfg    = cfg
-  _client = createClient(cfg.url, cfg.anonKey)
-  return _client
-}
+const _client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
 export function getClient() { return _client }
 

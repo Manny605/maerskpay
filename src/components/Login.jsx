@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { login } from '../lib/supabase'
 
-export default function Login({ onLoggedIn, onOpenConfig }) {
+export default function Login({ onLoggedIn }) {
   const [email,    setEmail]    = useState('')
   const [password, setPassword] = useState('')
   const [error,    setError]    = useState('')
@@ -63,14 +63,6 @@ export default function Login({ onLoggedIn, onOpenConfig }) {
 
           {error && <div className="text-red-600 dark:text-red-400 text-[11px] mt-3">{error}</div>}
         </form>
-
-        <button
-          type="button"
-          onClick={onOpenConfig}
-          className="text-t3 hover:text-t2 text-[10px] mt-6 block mx-auto underline underline-offset-2"
-        >
-          Config avancée
-        </button>
       </div>
     </div>
   )
